@@ -29,14 +29,21 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
     :param pretrain: use pretrained cnn nor not
     :return: the best test accuracy
     '''
+
     if use_gpu:
         device = torch.device('cuda')
     else:
         device = torch.device('cpu')
 
     directory = file_name.split('/')[-2]
-    if not os.path.exists(f'./results/{dataset}/{modal}/'+directory):
-        os.mkdir(f'./results/{dataset}/{modal}/'+directory)
+
+    # if not os.path.exists(f'./results/{dataset}/{modal}/'+directory):
+    #     os.mkdir(f'./results/{dataset}/{modal}/'+directory)
+
+    if not os.path.exists(f'./results/{dataset}/{modal}/s{subject}/'+directory):
+        os.mkdir(f'./results/{dataset}/{modal}/s{subject}/'+directory)
+
+    file_name = f'./results/{dataset}/{modal}/s{subject}/{directory}/' + directory
 
     if dataset == 'DEAP':
         ############## inter-subjects ##############
