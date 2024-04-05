@@ -8,12 +8,18 @@ import pandas as pd
 import math
 from collections import defaultdict
 from PIL import Image
-import _pickle as cPickle
+import pickle as cPickle
 import os
 import face_alignment
 from xml.dom.minidom import parse
 import pyedflib
 import shutil
+
+# correction 5
+import os
+import zipfile
+import re
+# correction 5
 
 
 # Stimulation time (second) of trials elicited by different videos in MAHNOB-HCI datasets; keys are the names of stimulation videos, values are the lengths of videos.
@@ -287,7 +293,7 @@ def face_detection_alignment_cropping(dataset='DEAP'):
     assert dataset in ['DEAP', 'MAHNOB'], 'Invalid dataset name'
 
     # facial landmarks detector; use gpu by changing device parameter to 'cuda'
-    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False, device='cpu')
+    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, flip_input=False, device='cpu')
 
     if dataset == 'DEAP':
         root = './datasets/DEAP/frames/'
@@ -298,9 +304,20 @@ def face_detection_alignment_cropping(dataset='DEAP'):
         des_path = './data/DEAP/faces/'
 
     for subject in os.listdir(root):
+
+        # correction 2 
+        bool = True
+        #correction 2
         for trial in os.listdir(root+subject):
             if os.path.exists(des_path + subject + '/' + trial):
                 continue
+            
+            # correction 1
+            if bool:
+                os.mkdir(des_path + subject)
+                bool = not bool
+            # correction  1
+
             os.mkdir(des_path + subject + '/' + trial)
             for frame in os.listdir(root+subject+'/'+trial):
                 frame_path = root + subject + '/' + trial + '/' + frame
@@ -322,6 +339,9 @@ def face_detection_alignment_cropping(dataset='DEAP'):
 # ************************* Bio-sensing Data Pre-process *************************
 
 def trial2segments(dataset='DEAP'):
+
+    print("In #trail2segments using dataset: " + dataset)
+
     '''
     Divide bio-sensing data of each trial to 1-second length segments, and perform baseline removal.
     Note, when dealing with MAHNOB-HCI dataset, EEG data should be common reference averaged, bandpass filtered and artefact removed using EEGLab,
@@ -336,6 +356,8 @@ def trial2segments(dataset='DEAP'):
         labels = pd.read_csv('./data/DEAP/labels/participant_ratings.csv')
         for file in os.listdir(root):
             subject = file.split('.')[0]
+
+            ## Go to File Data_preprocessed_python, remove the redundant file, copy the contents outside
             sub_id = int(subject[1:])
             os.mkdir(des_path + 's' + str(sub_id))
             f = open(root + file, 'rb')
@@ -389,7 +411,6 @@ def trial2segments(dataset='DEAP'):
                         np.save(f'{des_path}{subject}/{subject}_{trial}_{segment + 1}.npy', data)
 
 
-
 def preprocess_demo():
     '''
     This function pre-processes DEAP dataset.
@@ -399,6 +420,7 @@ def preprocess_demo():
     Note that faces cannot be detected from some frames, these frames should be replaced with the neighbour frame manually.
     '''
     # pre-process face data
+
     if not os.path.exists('./datasets/DEAP/frames/'):
         os.mkdir('./datasets/DEAP/frames/')
     if not os.path.exists('./data/'):
@@ -410,14 +432,19 @@ def preprocess_demo():
     if not os.path.exists('./data/DEAP/labels/'):
         os.mkdir('./data/DEAP/labels/')
     shutil.copy('./datasets/DEAP/metadata_csv/participant_ratings.csv', './data/DEAP/labels/participant_ratings.csv')
-    video2frames('DEAP')
-    face_detection_alignment_cropping('DEAP')
+
+    # video2frames('DEAP')
+
+    # face_detection_alignment_cropping('DEAP')
 
     # preprocess bio-sensing data
     if not os.path.exists('./data/DEAP/bio/'):
         os.mkdir('./data/DEAP/bio/')
     trial2segments('DEAP')
 
+    # Provide the directory you want to traverse and convert files to zip
+    # directory_to_traverse = './data/DEAP/faces'
+    # zip_dir_contents(directory_to_traverse)
 
 if __name__ == '__main__':
     preprocess_demo()

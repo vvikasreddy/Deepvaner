@@ -35,8 +35,12 @@ class DEAP(data.Dataset):
         self.label_path = f'./data/DEAP/labels/'
         self.face_path = f'./data/DEAP/faces/s{subject}.zip'
         self.labels = pd.read_csv(self.label_path+'participant_ratings.csv')
-        self.face_zip = zipfile.ZipFile(self.face_path, 'r')
+        # print(self.labels)
         self.bio_zip = zipfile.ZipFile(self.bio_path, 'r')
+        # print(self.face_path)
+        self.face_zip = zipfile.ZipFile(self.face_path, 'r')
+        
+        
         self.size = len(indices)
 
         if kind == 'train':
