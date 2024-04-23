@@ -81,7 +81,7 @@ def demo():
     parser.add_argument('--learn_rate', '-l', default=0.001, help='Learn rate in training', type=float)
     parser.add_argument('--gpu', '-g', default='True', help='Use gpu or not', type=str)
     # parser.add_argument('--file', '-f', default='./results/results.txt', help='File name to save the results', type=str)
-    parser.add_argument('--modal', '-m', default='eeg', help='Type of data to train', type=str)
+    parser.add_argument('--modal', '-m', default='face', help='Type of data to train', type=str)
     parser.add_argument('--subject', '-s', default=1, help='Subject id', type=int)
     parser.add_argument('--face_feature_size', default=16, help='Face feature size', type=int)
     parser.add_argument('--bio_feature_size', default=64, help='Bio feature size', type=int)
@@ -93,12 +93,7 @@ def demo():
     use_gpu = True if args.gpu == 'True' else False
     pretrain = True if args.pretrain == 'True' else False
 
-    if args.dataset == 'DEAP':
-        indices = list(range(deap_indices_dict[args.subject]))
-    if args.dataset == 'MAHNOB':
-        indices = list(range(mahnob_indices_dict[args.subject]))
-    # shuffle the dataset
-    random.shuffle(indices)
+    
 
     if not os.path.exists(f'./results/'):
         os.mkdir(f'./results/')
@@ -108,7 +103,16 @@ def demo():
         os.mkdir(f'./results/{args.dataset}/{args.modal}/')
 
 
-    for subject in range(1,33):
+    for subject in range(16,23):
+        
+
+        if args.dataset == 'DEAP':
+            indices = list(range(deap_indices_dict[subject]))
+        if args.dataset == 'MAHNOB':
+            indices = list(range(mahnob_indices_dict[subject]))
+        # shuffle the dataset
+        random.shuffle(indices)
+
         if not os.path.exists(f'./results/{args.dataset}/{args.modal}/s{subject}/'):
             os.mkdir(f'./results/{args.dataset}/{args.modal}/s{subject}/')
         
@@ -122,7 +126,7 @@ def demo():
                 
             if args.fusion == 'decision':
                 decision_fusion(args.dataset, args.modal, args.subject, k, args.label, indices, use_gpu, pretrain)
-
+        
 
 if __name__ == '__main__':
     demo()
