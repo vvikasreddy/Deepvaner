@@ -105,6 +105,7 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
 
         loss_meter.reset()
         for ii, (data,label) in enumerate(train_loader):
+            
             # print(ii)
             # train model
             if modal == 'faceeeg' or modal == 'faceperi' or modal == 'facebio':
