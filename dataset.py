@@ -11,6 +11,7 @@ import pandas as pd
 from torchvision import transforms as T
 import io
 import zipfile
+import math
 
 
 class DEAP(data.Dataset):
@@ -25,7 +26,7 @@ class DEAP(data.Dataset):
         indices : index of data samples (for dataset shuffle); an list of integers, default = list(range(2400)).
         label   : emotion label; {'valence', 'arousal'}, defualt = 'valence'.
     '''
-    def __init__(self, modal='facebio', subject=1, k=1, kind='all', indices=list(range(2400)),label='valence'):
+    def __init__(self, modal='eeg', subject=1, k=1, kind='all', indices=list(range(2400)),label='valence'):
         self.modal = modal
         self.subject = subject
         self.k = k
@@ -35,40 +36,48 @@ class DEAP(data.Dataset):
         self.label_path = f'./data/DEAP/labels/'
         self.face_path = f'./data/DEAP/faces/s{subject}.zip'
         self.labels = pd.read_csv(self.label_path+'participant_ratings.csv')
-        self.face_zip = zipfile.ZipFile(self.face_path, 'r')
+        # self.face_zip = zipfile.ZipFile(self.face_path, 'r')
         self.bio_zip = zipfile.ZipFile(self.bio_path, 'r')
         self.size = len(indices)
 
         if kind == 'train':
+            # self.indices contains 90 percent of the dataset indices. (has last 90 percent of values to be precise)
             self.indices = indices[:int((k - 1) * self.size / 10)] + indices[int(k * self.size / 10):]
+            
         if kind == 'val':
+            # self.indices contains first 10 percent of the dataset indices
             self.indices = indices[int((k - 1) * self.size / 10):int(k * self.size / 10)]
+            
         if kind == 'all':
             self.indices = indices
 
     def __getitem__(self, i):
         index = self.indices[i]
-        trial = index // 60 + 1
-        segment = index % 60 + 1
+        trial = index // 60 + 1  # indicates the index of trial of the subject
+        segment = index % 60 + 1 # indicates the particule minute of the trial
         prex = 's' + (str(self.subject) if self.subject > 9 else '0' + str(self.subject)) + '/s' + (
             str(self.subject) if self.subject > 9 else '0' + str(self.subject)) + '_trial' + (
                    str(trial) if trial > 9 else '0' + str(trial)) + '/s' + (
                    str(self.subject) if self.subject > 9 else '0' + str(self.subject)) + '_trial' + (
                    str(trial) if trial > 9 else '0' + str(trial))
+        
         transform = T.Compose([T.Resize((64, 64)),
                                T.ToTensor()])
 
-        face_data = []
-        for n in range(1, 6):
-            img = Image.open(io.BytesIO(self.face_zip.read(prex + f'_{(segment - 1) * 5 + n}.png')))
-            frame_array = transform(img)
-            frame_array = frame_array.view(1, 3, 64, 64)
-            face_data.append(frame_array)
-        face_data = torch.cat(face_data, dim=0)
+        print(f's{self.subject}/{self.subject}_{trial}_{segment}.npy', "here")
         bio_data = torch.tensor(
             np.load(io.BytesIO(self.bio_zip.read(f's{self.subject}/{self.subject}_{trial}_{segment}.npy')))).float()
+        
+        # print(bio_data.shape)
 
         if self.modal == 'face':
+            face_data = []
+            for n in range(1, 6):
+                img = Image.open(io.BytesIO(self.face_zip.read(prex + f'_{(segment - 1) * 5 + n}.png')))
+                frame_array = transform(img)
+                frame_array = frame_array.view(1, 3, 64, 64)
+                face_data.append(frame_array)
+            face_data = torch.cat(face_data, dim=0)
             data = face_data
         elif self.modal == 'eeg':
             data = bio_data[:32]
@@ -93,6 +102,97 @@ class DEAP(data.Dataset):
     def __len__(self):
         return len(self.indices)
 
+
+class SEED(data.Dataset):
+    '''
+    SEED dataset for per-subject experiments
+
+    Parameters:
+        modal   : data modality; {'eeg'}.
+        subject : subject ID; an integer between 1 and 15, default = 1.
+        k       : kth fold; an integer between 1 and 10, default = 1.
+        kind    : dataset type; {'train', 'val', 'all'}, default = 'all'.
+        indices : index of data samples (for dataset shuffle); an list of integers, default = list(range(2400)).
+        label   : emotion label {1:positive, 0:neutral and -1:negative}
+    '''
+
+    def __init__(self, label, modal='eeg', subject=1, k=1, kind='all', indices = list(range(10182))):
+        self.modal = modal
+        self.subject = subject
+        self.k = k
+        self.kind = kind
+        self.label = label
+        self.bio_path = f'./data/SEED/bio/s{subject}/'
+        self.label_path = f'./data/SEED/labels/'
+        # self.labels = pd.read_csv(self.label_path + 'participant_ratings.csv')
+        # self.face_zip = zipfile.ZipFile(self.face_path, 'r')
+        self.size = len(indices)
+
+        if kind == 'train':
+            # self.indices contains 90 percent of the dataset indices. (has last 90 percent of values to be precise)
+            self.indices = indices[:int((k - 1) * self.size / 10)] + indices[int(k * self.size / 10):]
+
+        if kind == 'val':
+            # self.indices contains first 10 percent of the dataset indices
+            self.indices = indices[int((k - 1) * self.size / 10):int(k * self.size / 10)]
+
+        if kind == 'all':
+            self.indices = indices
+
+        self.labels = {
+1:1,2:0,3:-1,4:-1,5:0,6:1,7:-1,8:0,9:1,10:1,11:0,12:-1,13:0,14:1,15:-1
+}
+
+    @staticmethod
+    def get_indices(root, subject, index, base=3398):
+
+        exp = math.ceil(index / base)
+        # print(index, base)
+        index = index % base
+
+        seed_indices_dict = {
+            1: 47000,
+            2: 46600,
+            3: 41200,
+            4: 47600,
+            5: 37000,
+            6: 39000,
+            7: 47400,
+            8: 43200,
+            9: 53000,
+            10: 47400,
+            11: 47000,
+            12: 46600,
+            13: 47000,
+            14: 47600,
+            15: 41200
+        }
+
+        count = 0
+        prev = 0
+        for i, j in seed_indices_dict.items():
+
+            count += (j / 200)
+            if count >= index:
+                trial = i
+                return f'{subject}_{exp}_eeg{trial}_{int(index - prev)}', trial
+            prev = count
+    def __getitem__(self, i):
+        print(i, "here")
+
+        exp_path, trial =  SEED.get_indices(self.bio_path, self.subject, i)
+        print(exp_path, trial, self.label)
+
+        bio_data = torch.tensor(
+            np.load(self.bio_path + exp_path + ".npy")).float()
+
+        assert bio_data.shape == (62,200)
+
+
+        return bio_data, self.labels[trial]
+
+    def __len__(self):
+        return len(self.indices)
 
 class MAHNOB(data.Dataset):
     '''
@@ -214,6 +314,8 @@ class DEAPAll(data.Dataset):
                              21: 2400,
                              22: 2400}
         self.sub_trial_seg = []
+
+        # The below code creates a tuple of all combinations of subject number, trail number, and segment number
         for sub in range(1,23):
             for trial in range(1,int(deap_indices_dict[sub]/60+1)):
                 for seg in range(1,61):
@@ -248,7 +350,7 @@ class DEAPAll(data.Dataset):
         face_data = torch.cat(face_data, dim=0)
 
         bio_data = torch.tensor(np.load(io.BytesIO(bio_zip.read(f's{subject}/{subject}_{trial}_{segment}.npy')))).float()
-
+        # print(bio_data.shape, "bio_data.shape")
         if self.modal == 'face':
             data = face_data
         elif self.modal == 'eeg':

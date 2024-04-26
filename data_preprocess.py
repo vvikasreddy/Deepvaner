@@ -14,6 +14,7 @@ import face_alignment
 from xml.dom.minidom import parse
 import pyedflib
 import shutil
+import scipy
 
 
 # Stimulation time (second) of trials elicited by different videos in MAHNOB-HCI datasets; keys are the names of stimulation videos, values are the lengths of videos.
@@ -287,7 +288,7 @@ def face_detection_alignment_cropping(dataset='DEAP'):
     assert dataset in ['DEAP', 'MAHNOB'], 'Invalid dataset name'
 
     # facial landmarks detector; use gpu by changing device parameter to 'cuda'
-    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False, device='cpu')
+    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, flip_input=False, device='cpu')
 
     if dataset == 'DEAP':
         root = './datasets/DEAP/frames/'
@@ -298,9 +299,19 @@ def face_detection_alignment_cropping(dataset='DEAP'):
         des_path = './data/DEAP/faces/'
 
     for subject in os.listdir(root):
+
+        # correction 1 
+        bool = True
+
         for trial in os.listdir(root+subject):
             if os.path.exists(des_path + subject + '/' + trial):
                 continue
+            
+            # correction 2
+            if bool :
+                os.mkdir(des_path + subject)
+                bool = not bool 
+        
             os.mkdir(des_path + subject + '/' + trial)
             for frame in os.listdir(root+subject+'/'+trial):
                 frame_path = root + subject + '/' + trial + '/' + frame
@@ -328,7 +339,7 @@ def trial2segments(dataset='DEAP'):
     and preprocessed EEG data files (one file per trial) should be stored in './datasets/MAHNOB/eeg_preprocessed/ folder in .npy format.
     :param dataset: used dataset
     '''
-    assert dataset in ['DEAP', 'MAHNOB'], 'Invalid dataset name'
+    assert dataset in ['DEAP', 'MAHNOB', "SEED"], 'Invalid dataset name'
 
     if dataset == 'DEAP':
         root = './datasets/DEAP/data_preprocessed_python/'
@@ -340,7 +351,8 @@ def trial2segments(dataset='DEAP'):
             os.mkdir(des_path + 's' + str(sub_id))
             f = open(root + file, 'rb')
             d = cPickle.load(f, encoding='latin1')
-            data = d['data']
+            data = d['data']    
+            # print(data.shape)
             for experiment in range(40):
                 trial = labels[(labels['Participant_id'] == sub_id) & (labels['Experiment_id'] == experiment + 1)][
                     'Trial'].iloc[0]
@@ -388,6 +400,44 @@ def trial2segments(dataset='DEAP'):
                             os.mkdir(f'{des_path}{subject}/')
                         np.save(f'{des_path}{subject}/{subject}_{trial}_{segment + 1}.npy', data)
 
+    if dataset == 'SEED':
+
+        root = "./datasets/seed/Preprocessed_EEG/"
+        des_path = "./data/seed/"
+        if not os.path.exists("./data"):
+            os.mkdir("./data")
+        if not os.path.exists(des_path):
+            os.mkdir(des_path)
+
+        # subject_trial represents nth trial of the subject
+        subject_trial = 1
+
+        for file in os.listdir(root):
+            # print(file)
+            subject = file.split("_")[0]
+            d = scipy.io.loadmat(root + file)
+            for key, value in d.items():
+                if not key.startswith("__"):
+                    exp = key.split("_")[1]
+                    second = 1
+                    last_sample = value.shape[1]
+                    while second * 200 != last_sample - 1:
+                        data_seg = value[:, second * 200:(second + 1) * 200]
+                        if not os.path.exists(des_path + 's' + subject):
+                            os.mkdir(des_path + 's' + subject)
+                        if not os.path.exists(des_path + "s" + subject + "/" + subject + "_" + str(subject_trial)):
+                            os.mkdir(des_path + "s" + subject + "/" + subject + "_" + str(subject_trial))
+
+                        # print(f"{des_path}s{subject}/{subject}_{subject_trial}/{subject}_{subject_trial}_{exp}_{second}.npy")
+                        np.save(
+                            f"{des_path}s{subject}/{subject}_{subject_trial}/{subject}_{subject_trial}_{exp}_{second}.npy",
+                            data_seg)
+                        second += 1
+
+            if subject_trial == 3:
+                subject_trial = 1
+            else:
+                subject_trial += 1
 
 
 def preprocess_demo():
@@ -410,8 +460,8 @@ def preprocess_demo():
     if not os.path.exists('./data/DEAP/labels/'):
         os.mkdir('./data/DEAP/labels/')
     shutil.copy('./datasets/DEAP/metadata_csv/participant_ratings.csv', './data/DEAP/labels/participant_ratings.csv')
-    video2frames('DEAP')
-    face_detection_alignment_cropping('DEAP')
+    # video2frames('DEAP')
+    # face_detection_alignment_cropping('DEAP')
 
     # preprocess bio-sensing data
     if not os.path.exists('./data/DEAP/bio/'):

@@ -6,8 +6,10 @@ import torch
 import os
 from torch.utils.data import DataLoader
 from models import DeepVANetBio, DeepVANetVision, DeepVANet
-from dataset import DEAP, MAHNOB, DEAPAll, MAHNOBAll
+# from models import DeepVANetBio
+from dataset import DEAP, MAHNOB, DEAPAll, MAHNOBAll, SEED
 from utils import out_put
+import mymodels
 
 
 def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indices, face_feature_size=16, bio_feature_size=64, use_gpu=False, pretrain=True):
@@ -34,9 +36,11 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
     else:
         device = torch.device('cpu')
 
+    print(file_name)
     directory = file_name.split('/')[-2]
     if not os.path.exists(f'./results/{dataset}/{modal}/'+directory):
         os.mkdir(f'./results/{dataset}/{modal}/'+directory)
+    
 
     if dataset == 'DEAP':
         ############## inter-subjects ##############
@@ -45,10 +49,15 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
             val_data = DEAPAll(modal=modal, k=k, kind='val', indices=indices, label=l)
         ############## per-subjects ##############
         else:
+            # correction 1, uncomment below line
             train_data = DEAP(modal=modal,subject=subject,k=k,kind='train',indices=indices, label=l)
+            # print("val data")
             val_data = DEAP(modal=modal,subject=subject,k=k,kind='val',indices=indices, label=l)
         bio_input_size = 40
         peri_input_size = 8
+
+
+
     if dataset == 'MAHNOB':
         ############## inter-subjects  ##############
         if subject == 0:
@@ -61,13 +70,23 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
         bio_input_size = 38
         peri_input_size = 6
 
+    if dataset == "SEED":
+        train_data = SEED(label = l, modal = "eeg", subject = subject, k = 1, kind='train', indices = indices)
+        val_data = SEED(label = l, modal = "eeg", subject = subject, k = 1, kind='val', indices = indices)
+        bio_input_size = 62
+
+    # print(train_data)
     # model
     if modal == 'face':
         model = DeepVANetVision(feature_size=face_feature_size,pretrain=pretrain).to(device)
     if modal == 'bio':
         model = DeepVANetBio(input_size=bio_input_size, feature_size=bio_feature_size).to(device)
     if modal == 'eeg':
-        model = DeepVANetBio(input_size=32, feature_size=bio_feature_size).to(device)
+        # changed here ....
+        if dataset == "SEED":
+            model = mymodels.DeepVANetBio(input_size=62, feature_size=bio_feature_size).to(device)
+        else:
+            model = DeepVANetBio(input_size=32, feature_size=bio_feature_size).to(device)
     if modal == 'peri':
         model = DeepVANetBio(input_size=peri_input_size, feature_size=bio_feature_size).to(device)
     if modal == 'faceeeg':
@@ -77,11 +96,17 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
     if modal == 'facebio':
         model = DeepVANet(bio_input_size=bio_input_size, face_feature_size=face_feature_size, bio_feature_size=bio_feature_size, pretrain=pretrain).to(device)
 
+    # print(train_data, "here")
+
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True)
 
-    # criterion and optimizer
-    criterion = torch.nn.BCELoss()
+    # criterion and optimizer changed....
+    if dataset == "SEED":
+        criterion = torch.nn.CrossEntropyLoss()
+    else:
+        criterion = torch.nn.BCELoss()
+
     lr = lr
     optimizer = torch.optim.Adam(model.parameters(),lr=lr)
 
@@ -105,7 +130,7 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
             else:
                 input = data.float().to(device)
             label = label.float().to(device)
-
+            print(input.shape)
             optimizer.zero_grad()
             pred = model(input).float()
             # print(pred.shape,label.shape)
@@ -160,10 +185,13 @@ def val(modal, model, dataloader, use_gpu):
             input = (data[0].float().to(device), data[1].float().to(device))
         else:
             input = data.float().to(device)
-        label = label.to(device)
-        pred = model(input).float()
 
-        pred = (pred >= 0.5).float().to(device).data
+        label = label.to(device)
+
+        _, pred = torch.max(model(input).float(), dim=1).to(device)
+        # pred = model(input).float()
+
+        # pred = (pred >= 0.5).float().to(device).data
         pred_label.append(pred)
         true_label.append(label)
 
