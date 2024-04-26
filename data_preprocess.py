@@ -286,6 +286,7 @@ def align_landmarks(landmarks):
 
 
 def face_detection_alignment_cropping(dataset='DEAP'):
+    
     '''
     Transfer frames to faces by face detection, alignment and cropping.
     :param dataset: used dataset
@@ -303,8 +304,10 @@ def face_detection_alignment_cropping(dataset='DEAP'):
         root = './datasets/MAHNOB/frames/'
         des_path = './data/DEAP/faces/'
 
+    
     for subject in os.listdir(root):
-
+       
+        
         # correction 2 
         bool = True
         #correction 2
@@ -321,10 +324,15 @@ def face_detection_alignment_cropping(dataset='DEAP'):
             os.mkdir(des_path + subject + '/' + trial)
             for frame in os.listdir(root+subject+'/'+trial):
                 frame_path = root + subject + '/' + trial + '/' + frame
+                
                 img = cv2.imread(frame_path)
+                
                 preds = fa.get_landmarks(img)
+                # print(preds)
                 try:
+                    # print(preds)
                     landmarks_list = preds[0]
+                    # print("here")
                     landmarks_dict = to_dict(landmarks_list)
                     aligned_face, eye_center, angle = align_face(image_array=img, landmarks=landmarks_dict)
                     rotated_landmarks = rotate_landmarks(landmarks=landmarks_dict, eye_center=eye_center, angle=angle,
@@ -334,6 +342,7 @@ def face_detection_alignment_cropping(dataset='DEAP'):
                     cv2.imwrite(des_path + subject + '/' + trial + '/' + frame, cropped_img)
                 except:
                     print(f'Fail to get the face image: {frame}')
+            
 
 
 # ************************* Bio-sensing Data Pre-process *************************
@@ -434,13 +443,12 @@ def preprocess_demo():
     shutil.copy('./datasets/DEAP/metadata_csv/participant_ratings.csv', './data/DEAP/labels/participant_ratings.csv')
 
     # video2frames('DEAP')
-
-    # face_detection_alignment_cropping('DEAP')
+    face_detection_alignment_cropping('DEAP')
 
     # preprocess bio-sensing data
     if not os.path.exists('./data/DEAP/bio/'):
         os.mkdir('./data/DEAP/bio/')
-    trial2segments('DEAP')
+    # trial2segments('DEAP')
 
     # Provide the directory you want to traverse and convert files to zip
     # directory_to_traverse = './data/DEAP/faces'

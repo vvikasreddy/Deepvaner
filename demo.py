@@ -103,9 +103,11 @@ def demo():
         os.mkdir(f'./results/{args.dataset}/{args.modal}/')
 
 
-    for subject in range(16,23):
-        
+    for subject in range(1,23):
 
+        if subject == 15:
+            continue
+        
         if args.dataset == 'DEAP':
             indices = list(range(deap_indices_dict[subject]))
         if args.dataset == 'MAHNOB':

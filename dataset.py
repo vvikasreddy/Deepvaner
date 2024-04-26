@@ -25,7 +25,7 @@ class DEAP(data.Dataset):
         indices : index of data samples (for dataset shuffle); an list of integers, default = list(range(2400)).
         label   : emotion label; {'valence', 'arousal'}, defualt = 'valence'.
     '''
-    def __init__(self, modal='facebio', subject=1, k=1, kind='all', indices=list(range(2400)),label='valence'):
+    def __init__(self, modal='face', subject=1, k=1, kind='all', indices=list(range(2400)),label='valence'):
         self.modal = modal
         self.subject = subject
         self.k = k
@@ -36,7 +36,7 @@ class DEAP(data.Dataset):
         self.face_path = f'./data/DEAP/faces/s{subject}.zip'
         self.labels = pd.read_csv(self.label_path+'participant_ratings.csv')
         # print(self.labels)
-        self.bio_zip = zipfile.ZipFile(self.bio_path, 'r')
+        # self.bio_zip = zipfile.ZipFile(self.bio_path, 'r')
         # print(self.face_path)
         self.face_zip = zipfile.ZipFile(self.face_path, 'r')
         
@@ -49,6 +49,7 @@ class DEAP(data.Dataset):
             self.indices = indices[int((k - 1) * self.size / 10):int(k * self.size / 10)]
         if kind == 'all':
             self.indices = indices
+
 
     def __getitem__(self, i):
         index = self.indices[i]
@@ -64,13 +65,26 @@ class DEAP(data.Dataset):
 
         face_data = []
         for n in range(1, 6):
-            img = Image.open(io.BytesIO(self.face_zip.read(prex + f'_{(segment - 1) * 5 + n}.png')))
-            frame_array = transform(img)
-            frame_array = frame_array.view(1, 3, 64, 64)
-            face_data.append(frame_array)
+            # print(prex + f'_{(segment - 1) * 5 + n}.png')
+            try:
+                img = Image.open(io.BytesIO(self.face_zip.read(prex + f'_{(segment - 1) * 5 + n}.png')))
+                
+                frame_array = transform(img)
+                frame_array = frame_array.view(1, 3, 64, 64)
+                face_data.append(frame_array)
+            except:
+                print(prex + f'_{(segment - 1) * 5 + n}.png' + " file not exists in location")
+            # print(prex + f'_{(segment - 1) * 5 + n}.png')
+
+        if len(face_data) == 0:
+            return None, None
+        
+        while len(face_data) != 5:
+            face_data.append(face_data[0])
+
         face_data = torch.cat(face_data, dim=0)
-        bio_data = torch.tensor(
-            np.load(io.BytesIO(self.bio_zip.read(f's{self.subject}/{self.subject}_{trial}_{segment}.npy')))).float()
+        # bio_data = torch.tensor(
+            # np.load(io.BytesIO(self.bio_zip.read(f's{self.subject}/{self.subject}_{trial}_{segment}.npy')))).float()
 
         if self.modal == 'face':
             data = face_data
@@ -150,11 +164,15 @@ class MAHNOB(data.Dataset):
                                T.ToTensor()])
         face_data = []
         for n in range(1, 6):
-            img = Image.open(
-                io.BytesIO(self.face_zip.read(f'{self.subject}/{trial}/{trial}_{(segment - 1) * 5 + n}.png')))
-            frame_array = transform(img)
-            frame_array = frame_array.view(1, 3, 64, 64)
-            face_data.append(frame_array)
+            if os.path.exists(f'{self.subject}/{trial}/{trial}_{(segment - 1) * 5 + n}.png'):
+                
+                img = Image.open(
+                    io.BytesIO(self.face_zip.read(f'{self.subject}/{trial}/{trial}_{(segment - 1) * 5 + n}.png')))
+                frame_array = transform(img)
+                frame_array = frame_array.view(1, 3, 64, 64)
+                face_data.append(frame_array)
+            else : 
+                print(f'{self.subject}/{trial}/{trial}_{(segment - 1) * 5 + n}.png', "file not present at the location")
         face_data = torch.cat(face_data, dim=0)
 
         bio_data = torch.tensor(np.load(io.BytesIO(self.bio_zip.read(f'{self.subject}/{self.subject}_{trial}_{segment}.npy')))).float()

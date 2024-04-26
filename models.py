@@ -5,6 +5,8 @@ Neural network models in DeepVANet
 import torch
 import torch.nn as nn
 import time
+from einops import rearrange, repeat
+from einops.layers.torch import Rearrange
 
 
 # The implementation of CONVLSTM are based on the code from
@@ -122,7 +124,74 @@ class FaceFeatureExtractorCNN(nn.Module):
         # self.load_state_dict(torch.load(path))
         self.load_state_dict(torch.load(path,map_location=torch.device('cpu')))
 
+# FaceFeatureExtractor of the prev implementation
+# class FaceFeatureExtractor(nn.Module):
+#     def __init__(self, feature_size=16, pretrain=True):
+#         super(FaceFeatureExtractor, self).__init__()
+#         cnn = FaceFeatureExtractorCNN()
+#         if pretrain:
+#             cnn.load('./pretrained_cnn.pth')
+#         self.cnn = cnn.net
+#         self.rnn = ConvLSTM(128, 128)
+#         self.fc = nn.Linear(128*6*6, feature_size)
 
+#     def forward(self, x):
+#         # input should be 5 dimension: (B, T, C, H, W)
+#         b, t, c, h, w = x.shape
+#         x = x.view(b * t, c, h, w)
+#         cnn_output = self.cnn(x)
+#         rnn_input = cnn_output.view(b, t, 128, 6, 6)
+#         rnn_output = self.rnn(rnn_input)
+#         rnn_output = torch.flatten(rnn_output, 1)
+#         output = self.fc(rnn_output)
+#         return output
+
+class ConvLSTMViT(nn.Module):
+    def __init__(self, input_channels, hidden_dim, emb_size=768, seq_len=5, img_size=(6, 6)):
+        super().__init__()
+        self.seq_len = seq_len
+        self.emb_size = emb_size
+        self.img_size = img_size
+        self.hidden_dim = hidden_dim
+
+        # Use a convolutional layer for initial patch extraction and embedding
+        self.conv_embedding = nn.Conv2d(input_channels, emb_size, kernel_size=(3, 3), stride=(3, 3), padding=1)
+        
+        # Assuming we flatten emb_size * number of patches as features for LSTM
+        num_patches = (img_size[0] // 3) * (img_size[1] // 3)  # This depends on the stride and kernel size of conv_embedding
+        lstm_input_size = emb_size * num_patches
+
+        # Replace Transformer with an LSTM for sequence processing
+        self.lstm = nn.LSTM(input_size=lstm_input_size, hidden_size=hidden_dim, batch_first=True)
+
+        # Final projection layer to map LSTM output back to image space
+        self.to_image_space = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim * img_size[0] * img_size[1]),  # Adjust output size based on your needs
+            Rearrange('b (c h w) -> b c h w', h=img_size[0], w=img_size[1], c=hidden_dim)
+        )
+
+    def forward(self, x):
+        # x shape: [batch_size, seq_len, channels, height, width]
+        b, t, c, h, w = x.shape
+        
+        # Apply convolutional embedding to each frame
+        x = rearrange(x, 'b t c h w -> (b t) c h w')
+        x = self.conv_embedding(x)
+        
+        # Flatten the features and prepare for LSTM
+        x = rearrange(x, '(b t) e h w -> b t (e h w)', b=b)
+        
+        # Process sequence with LSTM
+        x, (hn, cn) = self.lstm(x)
+        
+        # Optionally, use only the last hidden state for reconstruction or further processing
+        x = hn[-1]  # If you want to use the last hidden state
+        
+        # Project back to image space
+        x = self.to_image_space(x)
+        
+        return x
+    
 class FaceFeatureExtractor(nn.Module):
     def __init__(self, feature_size=16, pretrain=True):
         super(FaceFeatureExtractor, self).__init__()
@@ -130,7 +199,8 @@ class FaceFeatureExtractor(nn.Module):
         if pretrain:
             cnn.load('./pretrained_cnn.pth')
         self.cnn = cnn.net
-        self.rnn = ConvLSTM(128, 128)
+        # self.rnn = SimplifiedViT(input_channels=128, hidden_dim=128)
+        self.rnn = ConvLSTMViT(input_channels=128, hidden_dim=128)
         self.fc = nn.Linear(128*6*6, feature_size)
 
     def forward(self, x):
@@ -144,6 +214,7 @@ class FaceFeatureExtractor(nn.Module):
         output = self.fc(rnn_output)
         return output
 
+# BioFeatureExtracter of the original paper (only difference in the feedfortward part, (114 -> 120))
 
 # class BioFeatureExtractor(nn.Module):
 #     def __init__(self, input_size=32, feature_size=40):
@@ -244,6 +315,38 @@ class Transformer1d(nn.Module):
         x = self.fc(x)  # Shape becomes (ba||tch_size, n_classes)
         # print(x.shape)
         return x
+
+class TransformerFaceFeatureExtractor(nn.Module):
+    def __init__(self, feature_size=16, nhead=8, num_encoder_layers=3, dim_feedforward=2048, dropout=0.1, pretrain=True):
+        super(TransformerFaceFeatureExtractor, self).__init__()
+        # Assuming FaceFeatureExtractorCNN is defined elsewhere and pre-trained model loading logic is handled accordingly.
+        cnn = FaceFeatureExtractorCNN()
+        if pretrain:
+            cnn.load('./pretrained_cnn.pth')
+        self.cnn = cnn.net
+
+        d_model = 128 * 6 * 6  # Size of the input to the transformer (flattened CNN output)
+        encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=num_encoder_layers)
+
+        self.fc = nn.Linear(d_model, feature_size)
+
+    def forward(self, x):
+        b, t, c, h, w = x.shape
+        x = x.view(b * t, c, h, w)
+        cnn_output = self.cnn(x)  # (B*T, C, H, W)
+        cnn_output = torch.flatten(cnn_output, 1)  # (B*T, D)
+        cnn_output = cnn_output.view(b, t, -1).transpose(0, 1)  # (T, B, D)
+
+        # Without positional encoding, pass the CNN output directly to the transformer
+        transformer_output = self.transformer_encoder(cnn_output)  # (T, B, D)
+        transformer_output = transformer_output.transpose(0, 1)  # (B, T, D)
+        
+        # You might want to adjust this part depending on how you wish to aggregate or handle the output from the transformer.
+        transformer_output = transformer_output.mean(dim=1)  # Example: Average pooling across the temporal dimension
+
+        output = self.fc(transformer_output)
+        return output
     
 class DeepVANetBio(nn.Module):
     def __init__(self, input_size=32, feature_size=64):
