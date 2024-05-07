@@ -65,6 +65,7 @@ mahnob_indices_dict = {1: 1611,
              21: 1611,
              22: 1611,
              23: 1611,
+
              24: 1611,
              25: 1611,
              27: 1611,
@@ -103,8 +104,10 @@ def demo():
         os.mkdir(f'./results/{args.dataset}/{args.modal}/')
 
 
-    for subject in range(16,23):
-        
+    for subject in range(1,23):
+
+        if subject == 15:
+            continue
 
         if args.dataset == 'DEAP':
             indices = list(range(deap_indices_dict[subject]))
@@ -126,7 +129,8 @@ def demo():
                 
             if args.fusion == 'decision':
                 decision_fusion(args.dataset, args.modal, args.subject, k, args.label, indices, use_gpu, pretrain)
-        
+
+
 
 if __name__ == '__main__':
     demo()

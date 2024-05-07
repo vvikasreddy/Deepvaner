@@ -103,6 +103,7 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
         pred_label = []
         true_label = []
 
+        skip = 0
         loss_meter.reset()
         for ii, (data,label) in enumerate(train_loader):
             
@@ -117,17 +118,30 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
             optimizer.zero_grad()
             pred = model(input).float()
             # print(pred.shape,label.shape)
-            loss = criterion(pred, label)
-            loss.backward()
-            optimizer.step()
 
-            # meters update
-            loss_meter.add(loss.item())
+            try:
+                loss = criterion(pred, label)
 
-            pred = (pred >= 0.5).float().to(device).data
-            pred_label.append(pred)
-            true_label.append(label)
+                loss.backward()
+                optimizer.step()
 
+                # meters update
+                loss_meter.add(loss.item())
+
+                pred = (pred >= 0.5).float().to(device).data
+                pred_label.append(pred)
+                true_label.append(label)
+            except:
+                try :
+                    print(pred)
+                    print(loss.item())
+                except Exception as E:
+                    print(E)
+                skip = 1
+
+        if skip:
+            print(f"skipped epoch {epoch} for subject {subject}")
+            continue
         pred_label = torch.cat(pred_label,0)
         true_label = torch.cat(true_label,0)
 
@@ -143,6 +157,8 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
             best_accuracy = val_accuracy
             best_epoch = epoch
             model.save(f"{file_name}_best.pth")
+
+        print(f"epoch {epoch}: successful")
 
     model.save(f'{file_name}.pth')
 

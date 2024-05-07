@@ -36,6 +36,7 @@ class DEAP(data.Dataset):
         self.face_path = f'./data/DEAP/faces/s{subject}.zip'
         self.labels = pd.read_csv(self.label_path+'participant_ratings.csv')
         # print(self.labels)
+        # uncomment
         self.bio_zip = zipfile.ZipFile(self.bio_path, 'r')
         # print(self.face_path)
         self.face_zip = zipfile.ZipFile(self.face_path, 'r')
@@ -64,11 +65,26 @@ class DEAP(data.Dataset):
 
         face_data = []
         for n in range(1, 6):
-            img = Image.open(io.BytesIO(self.face_zip.read(prex + f'_{(segment - 1) * 5 + n}.png')))
-            frame_array = transform(img)
-            frame_array = frame_array.view(1, 3, 64, 64)
-            face_data.append(frame_array)
+            # print(prex + f'_{(segment - 1) * 5 + n}.png')
+            try:
+                img = Image.open(io.BytesIO(self.face_zip.read(prex + f'_{(segment - 1) * 5 + n}.png')))
+
+                frame_array = transform(img)
+                frame_array = frame_array.view(1, 3, 64, 64)
+                face_data.append(frame_array)
+            except:
+                print(prex + f'_{(segment - 1) * 5 + n}.png' + " file not exists in location")
+            # print(prex + f'_{(segment - 1) * 5 + n}.png')
+
+        if len(face_data) == 0:
+            return None, None
+
+        while len(face_data) != 5:
+            face_data.append(face_data[0])
+
         face_data = torch.cat(face_data, dim=0)
+
+
         bio_data = torch.tensor(
             np.load(io.BytesIO(self.bio_zip.read(f's{self.subject}/{self.subject}_{trial}_{segment}.npy')))).float()
 

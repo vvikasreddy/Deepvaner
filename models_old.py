@@ -291,8 +291,8 @@ class DeepVANetBio(nn.Module):
 
 
 
-
-
+#
+#
 class DeepVANetVision(nn.Module):
     def __init__(self,feature_size=16,pretrain=True):
         super(DeepVANetVision,self).__init__()
