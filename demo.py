@@ -7,6 +7,9 @@ from decision_level_fusion import decision_fusion
 import random
 import argparse
 import os
+
+os.environ['CUDA_LAUNCH_BLOCKING']="1"
+os.environ["TORCH_USE_CUDA_DSA"] = "1"
  
 
 # deap subject_id: sample number
@@ -77,12 +80,12 @@ def demo():
     parser = argparse.ArgumentParser(description='Per-subject experiment')
     parser.add_argument('--dataset', '-d', default='DEAP', help='The dataset used for evaluation', type=str)
     parser.add_argument('--fusion', default='feature', help='Fusion strategy (feature or decision)', type=str)
-    parser.add_argument('--epoch', '-e', default=25, help='The number of epochs in training', type=int)
+    parser.add_argument('--epoch', '-e', default=30, help='The number of epochs in training', type=int)
     parser.add_argument('--batch_size', '-b', default=64, help='The batch size used in training', type=int)
     parser.add_argument('--learn_rate', '-l', default=0.001, help='Learn rate in training', type=float)
     parser.add_argument('--gpu', '-g', default='True', help='Use gpu or not', type=str)
     # parser.add_argument('--file', '-f', default='./results/results.txt', help='File name to save the results', type=str)
-    parser.add_argument('--modal', '-m', default='face', help='Type of data to train', type=str)
+    parser.add_argument('--modal', '-m', default='facebio', help='Type of data to train', type=str)
     parser.add_argument('--subject', '-s', default=1, help='Subject id', type=int)
     parser.add_argument('--face_feature_size', default=16, help='Face feature size', type=int)
     parser.add_argument('--bio_feature_size', default=64, help='Bio feature size', type=int)
@@ -104,7 +107,7 @@ def demo():
         os.mkdir(f'./results/{args.dataset}/{args.modal}/')
 
 
-    for subject in range(1,23):
+    for subject in range(11,23):
 
         if subject == 15:
             continue
@@ -119,16 +122,19 @@ def demo():
         if not os.path.exists(f'./results/{args.dataset}/{args.modal}/s{subject}/'):
             os.mkdir(f'./results/{args.dataset}/{args.modal}/s{subject}/')
         
-        
+
         for k in range(1, 11):
             if args.fusion == 'feature':
-                train(modal=args.modal, dataset=args.dataset, epoch=args.epoch, lr=args.learn_rate, use_gpu=use_gpu,
-                            file_name=f'./results/{args.dataset}/{args.modal}/{args.dataset}_{args.modal}_{args.label}_s{subject}_k{k}_{args.face_feature_size}_{args.bio_feature_size}/{args.dataset}_{args.modal}_{args.label}_s{args.subject}_k{k}_{args.face_feature_size}_{args.bio_feature_size}',
-                            batch_size=args.batch_size, subject=subject, k=k, l=args.label, indices=indices,
-                            face_feature_size=args.face_feature_size, bio_feature_size=args.bio_feature_size, pretrain=pretrain)
-                
+                try :
+                    train(modal=args.modal, dataset=args.dataset, epoch=args.epoch, lr=args.learn_rate, use_gpu=use_gpu,
+                                file_name=f'./results/{args.dataset}/{args.modal}/{args.dataset}_{args.modal}_{args.label}_s{subject}_k{k}_{args.face_feature_size}_{args.bio_feature_size}/{args.dataset}_{args.modal}_{args.label}_s{args.subject}_k{k}_{args.face_feature_size}_{args.bio_feature_size}',
+                                batch_size=args.batch_size, subject=subject, k=k, l=args.label, indices=indices,
+                                face_feature_size=args.face_feature_size, bio_feature_size=args.bio_feature_size, pretrain=pretrain)
+                except Exception as e:
+                    print(f"skipped the {k}th cross validation because of exception {e}")
             if args.fusion == 'decision':
                 decision_fusion(args.dataset, args.modal, args.subject, k, args.label, indices, use_gpu, pretrain)
+
 
 
 

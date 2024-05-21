@@ -82,6 +82,7 @@ class DEAP(data.Dataset):
         while len(face_data) != 5:
             face_data.append(face_data[0])
 
+        # print(face_data[0].shape, "in face data")
         face_data = torch.cat(face_data, dim=0)
 
 
