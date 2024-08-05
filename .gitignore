@@ -1,0 +1,15 @@
+
+cuda_env(1).yml
+/data/
+data_preprocess_env.yml
+/datasets/
+/deepvanetcuda.yml
+demo.py
+/grapher.py
+models.py
+/results - I DONT KNOW/
+/results-18-transformer1d/
+/results/
+tempCodeRunnerFile.python
+train.py
+useless.py
