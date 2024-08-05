@@ -2,6 +2,12 @@
 
 The PyTorch implementation for the paper 'DeepVANet: A Deep End-to-End Network for Multi-modal Emotion Recognition'.    
 
+# REMEMBER : 
+
+1. commented the bio file path, uncomment in future.
+
+
+
 ## Dependencies
 + Python 3.7
 + PyTorch 1.5.0

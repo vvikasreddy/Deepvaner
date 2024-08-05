@@ -42,13 +42,13 @@ class ConvLSTMViT(nn.Module):
         # Apply convolutional embedding to each frame
         x = rearrange(x, 'b t c h w -> (b t) c h w')
 
-        # print(x.shape)
-        x = self.conv_embedding(x)
-        # print(x.shape, "after")
 
+        x = self.conv_embedding(x)
+
+        print("shape here ", x.shape)
         # Flatten the features and prepare for LSTM
         x = rearrange(x, '(b t) e h w -> b t (e h w)', b=b)
-        # print(x.shape, "important")
+        
         # Process sequence with LSTM
         x, (hn, cn) = self.lstm(x)
         
@@ -70,7 +70,7 @@ class FaceFeatureExtractorCNN(nn.Module):
             nn.Conv2d(32, 64, kernel_size=3),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2),
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.Conv2d(64, 128, kernel_size=3, padding = 1),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2),
         )
@@ -118,12 +118,11 @@ class FaceFeatureExtractor(nn.Module):
         # input should be 5 dimension: (B, T, C, H, W)
 
         b, t, c, h, w = x.shape
-        # print(x.shape)
+
         x = x.view(b * t, c, h, w)
 
         cnn_output = self.cnn(x)
-
-
+        print(cnn_output.shape)
         rnn_input = cnn_output.view(b, t, 128, 6, 6)
 
         rnn_output = self.rnn(rnn_input)
@@ -156,26 +155,6 @@ class BioFeatureExtractor(nn.Module):
         # print(x.shape)
         return x
 
-import math
-
-class PositionalEncoding(nn.Module):
-
-    def __init__(self, d_model, dropout=0.1, max_len=128):
-        super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
-        return self.dropout(x)
-
 
 
 class Transformer1d(nn.Module):
@@ -189,7 +168,7 @@ class Transformer1d(nn.Module):
 
         # Assuming input_size is not necessarily equal to d_model
         self.input_projection = nn.Linear(input_size, d_model)
-        # self.position_embedding = PositionalEncoding(d_model, 0.1, 128 )
+
         # Transformer Encoder Layer
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model, 
@@ -215,8 +194,7 @@ class Transformer1d(nn.Module):
         # Project input to d_model dimension
         x = x.permute(2, 0, 1)  # Change shape to (n_length, batch_size, input_size)
         x = self.input_projection(x)  # Shape becomes (n_length, batch_size, d_model)
-        # print(x.shape)
-        # x = self.position_embedding(x)
+
         # Pass through the Transformer encoder
         x = self.transformer_encoder(x)  # Shape remains (n_length, batch_size, d_model)
 
@@ -237,7 +215,7 @@ class DeepVANetBio(nn.Module):
                                         input_size, 
                                         n_classes=64, 
                                         n_length=128, 
-                                        d_model=40,
+                                        d_model=32, 
                                         nhead=8, 
                                         dim_feedforward=128, 
                                         dropout=0.1, 
@@ -276,33 +254,13 @@ class DeepVANetBio(nn.Module):
 
 
 # class VisionTransformer()
-import torchvision
-def get_transformer():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # 1. Get pretrained weights for ViT-Base
-    pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
 
-    # 2. Setup a ViT model instance with pretrained weights
-    model = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
-
-    # 3. Freeze the base parameters
-    for parameter in model.parameters():
-        parameter.requires_grad = False
-
-    # 4. Change the classifier head
-    class_names = [0,1]
-
-    # set_seeds()
-    model.heads = nn.Linear(in_features=768, out_features=2).to(device)
-    # pretrained_vit # uncomment for model output
-
-    pretrained_vit_transforms = pretrained_vit_weights.transforms()
 
 
 class DeepVANetVision(nn.Module):
     def __init__(self,feature_size=16,pretrain=True):
         super(DeepVANetVision,self).__init__()
-        self.features = FaceFeatureExtractor(feature_size=feature_size,pretrain=pretrain)
+        # self.features = FaceFeatureExtractor(feature_size=feature_size,pretrain=pretrain)
         # self.features = TransformerFaceFeatureExtractor(feature_size=feature_size,pretrain=pretrain)
         self.classifier = nn.Sequential(
             nn.Linear(feature_size, 20),
@@ -362,10 +320,10 @@ class DeepVANet(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self,x):
+    def forward(self,x,y):
         # print("we made it ")
-        img_features = self.face_feature_extractor(x[0])
-        bio_features = self.bio_feature_extractor(x[1])
+        img_features = self.face_feature_extractor(x)
+        bio_features = self.bio_feature_extractor(y)
         features = torch.cat([img_features,bio_features.float()],dim=1)
         output = self.classifier(features)
         output = output.squeeze(-1)
@@ -383,5 +341,5 @@ class DeepVANet(nn.Module):
 
     def load(self, path):
         self.load_state_dict(torch.load(path))
-        self.load_state_dict(torch.load(path,map_location=torch.device('cpu')))
+        # self.load_state_dict(torch.load(path,map_location=torch.device('cpu')))
 

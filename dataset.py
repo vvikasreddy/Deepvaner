@@ -4,6 +4,7 @@ DEAP and MAHNOB datasets
 
 import torch
 import os
+from torchvision.transforms import v2
 from PIL import Image
 from torch.utils import data
 import numpy as np
@@ -50,7 +51,7 @@ class DEAP(data.Dataset):
             self.indices = indices[int((k - 1) * self.size / 10):int(k * self.size / 10)]
         if kind == 'all':
             self.indices = indices
-
+        print(len(self.indices), "len of indices in dataset calss ")
     def __getitem__(self, i):
         index = self.indices[i]
         trial = index // 60 + 1
@@ -68,7 +69,7 @@ class DEAP(data.Dataset):
             # print(prex + f'_{(segment - 1) * 5 + n}.png')
             try:
                 img = Image.open(io.BytesIO(self.face_zip.read(prex + f'_{(segment - 1) * 5 + n}.png')))
-
+                # print(prex + f'_{(segment - 1) * 5 + n}.png')
                 frame_array = transform(img)
                 frame_array = frame_array.view(1, 3, 64, 64)
                 face_data.append(frame_array)
@@ -76,9 +77,13 @@ class DEAP(data.Dataset):
                 print(prex + f'_{(segment - 1) * 5 + n}.png' + " file not exists in location")
             # print(prex + f'_{(segment - 1) * 5 + n}.png')
 
-        if len(face_data) == 0:
-            return None, None
 
+        if len(face_data) == 0:
+            # img = Image.open(io.BytesIO(self.face_zip.read("D:/Vikas/Deepvanet/Deepvaner/data/DEAP/faces/s11.zip/s11/s11_trial01/s11_trial01_1.png")))
+            img = Image.open("D:/Vikas/Deepvanet/Deepvaner/s11_trial01_1.png")
+            frame_array = transform(img)
+            frame_array = frame_array.view(1, 3, 64, 64)
+            face_data.append(frame_array)
         while len(face_data) != 5:
             face_data.append(face_data[0])
 
@@ -106,10 +111,20 @@ class DEAP(data.Dataset):
 
         valence = 0 if self.labels[(self.labels['Participant_id']==self.subject) & (self.labels['Trial']==trial)]['Valence'].iloc[0] < 5 else 1
         arousal = 0 if self.labels[(self.labels['Participant_id']==self.subject) & (self.labels['Trial']==trial)]['Arousal'].iloc[0] < 5 else 1
+        dominance = 0 if self.labels[(self.labels['Participant_id']==self.subject) & (self.labels['Trial']==trial)]['Dominance'].iloc[0] < 5 else 1
+        liking = 0 if self.labels[(self.labels['Participant_id']==self.subject) & (self.labels['Trial']==trial)]['Liking'].iloc[0] < 5 else 1
+
+
+
+
         if self.label == 'valence':
             return data, valence
-        else:
+        elif self.label == "arousal":
             return data, arousal
+        elif self.label == "dominance":
+            return data, dominance
+        elif self.label == "liking":
+            return data, liking
 
     def __len__(self):
         return len(self.indices)
@@ -163,8 +178,12 @@ class MAHNOB(data.Dataset):
     def __getitem__(self, i):
         index = self.indices[i]
         trial, segment = self.trial_seg[index]
-        transform = T.Compose([T.Resize((64, 64)),
-                               T.ToTensor()])
+        transform = v2.Compose([
+            v2.RandomResizedCrop(size=(224, 224), antialias=True),
+            v2.RandomHorizontalFlip(p=0.5),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
         face_data = []
         for n in range(1, 6):
             img = Image.open(

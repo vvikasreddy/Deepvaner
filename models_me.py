@@ -156,6 +156,7 @@ class ConvLSTMViT(nn.Module):
         # Apply convolutional embedding to each frame
         x = rearrange(x, 'b t c h w -> (b t) c h w')
         x = self.conv_embedding(x)
+        print(x.shape, "after convoltuions")
 
         # Flatten the features and prepare for LSTM
         x = rearrange(x, '(b t) e h w -> b t (e h w)', b=b)
@@ -184,7 +185,7 @@ class FaceFeatureExtractorCNN(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2),
 
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.Conv2d(64, 128, kernel_size=3),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2),
 
@@ -228,12 +229,13 @@ class FaceFeatureExtractor(nn.Module):
         # self.rnn = SimplifiedViT(input_channels=128, hidden_dim=128)
         self.rnn = ConvLSTMViT(input_channels=128, hidden_dim=128)
         self.fc = nn.Linear(128 * 6 * 6, feature_size)
-
+        # print(feature_size, "FaceFeatureExtractor")
     def forward(self, x):
         # input should be 5 dimension: (B, T, C, H, W)
         b, t, c, h, w = x.shape
         x = x.view(b * t, c, h, w)
         cnn_output = self.cnn(x)
+        print(cnn_output.shape, "cnn 3 layer output")
         rnn_input = cnn_output.view(b, t, 128, 6, 6)
         rnn_output = self.rnn(rnn_input)
         rnn_output = torch.flatten(rnn_output, 1)
@@ -301,9 +303,10 @@ class Transformer1d(nn.Module):
         self.n_length = n_length
         self.d_model = d_model
 
+        # print(input_size, d_model)
         # Assuming input_size is not necessarily equal to d_model
         self.input_projection = nn.Linear(input_size, d_model)
-
+        # print(self.input_projection)
         # Transformer Encoder Layer
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
@@ -462,7 +465,7 @@ class DeepVANet(nn.Module):
 
         self.bio_feature_extractor = Transformer1d(
             bio_input_size,
-            n_classes=64,
+            n_classes=bio_feature_size,
             n_length=128,
             d_model=32,
             nhead=8,
@@ -470,17 +473,17 @@ class DeepVANet(nn.Module):
             dropout=0.2,
             activation='relu'
         )
-
-        self.features_combined = Transformer1d(80,
-                                      n_classes=64,
-                                      n_length=128,
+        # print(face_feature_size, bio_feature_size)
+        self.features_combined = Transformer1d(1,
+                                      n_classes=128,
+                                      n_length=face_feature_size + bio_feature_size,
                                       d_model=32,
                                       nhead = 8,
                                       dim_feedforward=128,
                                       dropout=0.2,
                                       activation='relu')
 
-
+        # change n_classes and Linear in:features, to change the output dim from the transformer
 
         self.classifier = nn.Sequential(
             nn.Linear(face_feature_size + bio_feature_size, 20),
@@ -490,25 +493,38 @@ class DeepVANet(nn.Module):
             nn.Sigmoid()
         ) # actual
 
+        # self.classifier2 = nn.Sequential(
+        #     nn.Linear(32, 16),
+        #     nn.ReLU(inplace=True),
+        #     nn.Dropout(),
+        #     nn.Linear(16, 1),
+        #     nn.ReLU(inplace=True),
+        #     nn.Dropout(),
+        #     nn.Sigmoid()
+        # )
+
         self.classifier2 = nn.Sequential(
-            nn.Linear(64, 20),
-            nn.ReLU(inplace = True),
+
+            nn.Linear(128, 20),
+            nn.ReLU(inplace=True),
             nn.Dropout(),
             nn.Linear(20, 1),
+            nn.ReLU(inplace=True),
             nn.Sigmoid()
-        )
-
+        ) #try if we get vanishing
     def forward(self, x):
         img_features = self.face_feature_extractor(x[0]) # 64 x 64
-        print(x[1].size())
+        # print(x[1].size())
         bio_features = self.bio_feature_extractor(x[1]) # 64 x 16
         # print(img_features.size(), "img_features")
         # print(bio_features.size(), "bio_fefatures")
+        # print("ok done")
         features = torch.cat([img_features, bio_features.float()], dim=1)# 64 X 80
-        print(features.size(), "features")
-        # print(features)
+        # print(features.size(), "features")
+        features = torch.unsqueeze(features, dim=1)
+        # print(features.size())
         output = self.features_combined(features)
-        print(output.size(), "my")
+        # print(output.size(), "my")
         output = self.classifier2(output)
         # output = self.classifier(features)
         output = output.squeeze(-1)

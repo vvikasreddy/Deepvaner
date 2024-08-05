@@ -4,7 +4,7 @@ Decision-level fusion functions
 
 from dataset import DEAP, MAHNOB
 from train import train
-from models import DeepVANetVision, DeepVANetBio, DeepVANet
+from models_me import DeepVANetVision, DeepVANetBio, DeepVANet
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
