@@ -26,10 +26,11 @@ class DEAP(data.Dataset):
         indices : index of data samples (for dataset shuffle); an list of integers, default = list(range(2400)).
         label   : emotion label; {'valence', 'arousal'}, defualt = 'valence'.
     '''
-    def __init__(self, modal='facebio', subject=1, k=1, kind='all', indices=list(range(2400)),label='valence'):
+    def __init__(self, modal='facebio', subject=1, k=1, kind='all', indices=list(range(2400)),label='valence', type = "MIT"):
         self.modal = modal
         self.subject = subject
         self.k = k
+        self.type = type
         self.kind = kind
         self.label = label
         self.bio_path = f'./data/DEAP/bio/s{subject}.zip'
@@ -44,6 +45,11 @@ class DEAP(data.Dataset):
         
         
         self.size = len(indices)
+
+        if self.type == "MIT":
+            self.dim = 224
+        else:
+            self.dim = 64
 
         if kind == 'train':
             self.indices = indices[:int((k - 1) * self.size / 10)] + indices[int(k * self.size / 10):]
@@ -61,8 +67,14 @@ class DEAP(data.Dataset):
                    str(trial) if trial > 9 else '0' + str(trial)) + '/s' + (
                    str(self.subject) if self.subject > 9 else '0' + str(self.subject)) + '_trial' + (
                    str(trial) if trial > 9 else '0' + str(trial))
-        transform = T.Compose([T.Resize((64, 64)),
-                               T.ToTensor()])
+        mean = [0.485, 0.456, 0.406]  # Mean for RGB channels
+        std = [0.229, 0.224, 0.225]  # Std for RGB channels
+
+        transform = T.Compose([
+            T.Resize((self.dim, self.dim)),  # Resize the image to the desired dimensions
+            T.ToTensor(),  # Convert the image to a tensor
+            T.Normalize(mean=mean, std=std)  # Normalize the image
+        ])
 
         face_data = []
         for n in range(1, 6):
@@ -71,7 +83,7 @@ class DEAP(data.Dataset):
                 img = Image.open(io.BytesIO(self.face_zip.read(prex + f'_{(segment - 1) * 5 + n}.png')))
                 # print(prex + f'_{(segment - 1) * 5 + n}.png')
                 frame_array = transform(img)
-                frame_array = frame_array.view(1, 3, 64, 64)
+                frame_array = frame_array.view(1, 3,self.dim, self.dim)
                 face_data.append(frame_array)
             except:
                 print(prex + f'_{(segment - 1) * 5 + n}.png' + " file not exists in location")
@@ -82,7 +94,7 @@ class DEAP(data.Dataset):
             # img = Image.open(io.BytesIO(self.face_zip.read("D:/Vikas/Deepvanet/Deepvaner/data/DEAP/faces/s11.zip/s11/s11_trial01/s11_trial01_1.png")))
             img = Image.open("D:/Vikas/Deepvanet/Deepvaner/s11_trial01_1.png")
             frame_array = transform(img)
-            frame_array = frame_array.view(1, 3, 64, 64)
+            frame_array = frame_array.view(1, 3, self.dim, self.dim)
             face_data.append(frame_array)
         while len(face_data) != 5:
             face_data.append(face_data[0])
@@ -93,6 +105,14 @@ class DEAP(data.Dataset):
 
         bio_data = torch.tensor(
             np.load(io.BytesIO(self.bio_zip.read(f's{self.subject}/{self.subject}_{trial}_{segment}.npy')))).float()
+
+        # Calculate mean and std for each row (channel)
+        mean = bio_data.mean(dim=1, keepdim=True)
+        std = bio_data.std(dim=1, keepdim=True)
+
+        # Normalize each row (channel-wise)
+        epsilon = 1e-8  # Small constant to avoid division by zero
+        bio_data = (bio_data - mean) / (std + epsilon)
 
         if self.modal == 'face':
             data = face_data

@@ -1,0 +1,2 @@
+Epoch: train0| train accuracy: 0.854629635810852
+Epoch: train0| train loss: 0.3069163188331529| val accuracy: 0.9583333134651184

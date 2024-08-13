@@ -79,7 +79,7 @@ def demo():
     parser = argparse.ArgumentParser(description='Per-subject experiment')
     parser.add_argument('--dataset', '-d', default='DEAP', help='The dataset used for evaluation', type=str)
     parser.add_argument('--fusion', default='feature', help='Fusion strategy (feature or decision)', type=str)
-    parser.add_argument('--epoch', '-e', default=30, help='The number of epochs in training', type=int)
+    parser.add_argument('--epoch', '-e', default=20, help='The number of epochs in training', type=int)
     parser.add_argument('--batch_size', '-b', default=1, help='The batch size used in training', type=int)
     parser.add_argument('--learn_rate', '-l', default=0.001, help='Learn rate in training', type=float)
     parser.add_argument('--gpu', '-g', default='True', help='Use gpu or not', type=str)
@@ -105,9 +105,8 @@ def demo():
     if not os.path.exists(f'./results/{args.dataset}/{args.modal}/'):
         os.mkdir(f'./results/{args.dataset}/{args.modal}/')
 
-    subjects = [17,22]
 
-    for subject in subjects:
+    for subject in range(2,23):
 
 
         if args.dataset == 'DEAP':
@@ -121,7 +120,7 @@ def demo():
             os.mkdir(f'./results/{args.dataset}/{args.modal}/s{subject}/')
         
 
-        for k in range(5, 11):
+        for k in range(1, 11):
             if args.fusion == 'feature':
                     train(modal=args.modal, dataset=args.dataset, epoch=args.epoch, lr=args.learn_rate, use_gpu=use_gpu,
                                 file_name=f'./results/{args.dataset}/{args.modal}/{args.dataset}_{args.modal}_{args.label}_s{subject}_k{k}_{args.face_feature_size}_{args.bio_feature_size}/{args.dataset}_{args.modal}_{args.label}_s{args.subject}_k{k}_{args.face_feature_size}_{args.bio_feature_size}',

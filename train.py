@@ -8,7 +8,11 @@ import torch
 from torchsummary import summary
 import os
 from torch.utils.data import DataLoader
-from models_deepvanet_paper import DeepVANetBio, DeepVANetVision, DeepVANet
+
+
+# use models_deepvanet_paper for transformer_eeg and conv_ for face
+# use models_ for transformer_eeg and transformer_face
+from models_Copy_resmit_copy_backup import DeepVANetBio, DeepVANetVision, DeepVANet
 from dataset import DEAP, MAHNOB, DEAPAll, MAHNOBAll
 from utils import out_put
 
@@ -114,8 +118,8 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
             val_data = DEAPAll(modal=modal, k=k, kind='val', indices=indices, label=l)
         ############## per-subjects ##############
         else:
-            train_data = DEAP(modal=modal,subject=subject,k=k,kind='train',indices=indices, label=l)
-            val_data = DEAP(modal=modal,subject=subject,k=k,kind='val',indices=indices, label=l)
+            train_data = DEAP(modal=modal,subject=subject,k=k,kind='train',indices=indices, label=l, type="MIT")
+            val_data = DEAP(modal=modal,subject=subject,k=k,kind='val',indices=indices, label=l, type = "MIT")
         bio_input_size = 40
         peri_input_size = 8
     if dataset == 'MAHNOB':
@@ -145,10 +149,12 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
     if modal == 'faceperi':
         model = DeepVANet(bio_input_size=peri_input_size, face_feature_size=face_feature_size, bio_feature_size=bio_feature_size, pretrain=pretrain).to(device)
     if modal == 'facebio':
-        # print("here. dont worry")
+        print("here. dont worry")
         model = DeepVANet(bio_input_size=bio_input_size, face_feature_size=face_feature_size, bio_feature_size=bio_feature_size, pretrain=pretrain).to(device)
 
+    # to print the parameters of the model
     count_parameters(model)
+
     # model.apply(init_xavier_all)
     # model.apply(init_xavier_all)
     # Apply the custom initialization
@@ -181,10 +187,11 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
         loss_meter.reset()
 
         for ii, (data,label) in enumerate(train_loader):
-            
+
+
             # print(ii)
 
-            print(data[0].shape, data[1].shape)
+            # print(data[0].shape, data[1].shape)
             # train model
             if modal == 'faceeeg' or modal == 'faceperi' or modal == 'facebio':
                 input = (data[0].float().to(device), data[1].float().to(device))
@@ -202,8 +209,10 @@ def train(modal, dataset, subject, k, l, epoch, lr, batch_size, file_name, indic
             pred = pred.view((-1))
             # try:
 
+            # print(pred, label, ii)
 
             loss = criterion(pred, label)
+            # print(loss, "loss")
 
             # print(pred, label)
             # print("het", loss)
